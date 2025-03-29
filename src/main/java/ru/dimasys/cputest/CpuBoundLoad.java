@@ -4,31 +4,19 @@ import org.springframework.stereotype.Component;
 
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
 @Component
-public class CpuLoadExecutor {
-
-    private final ExecutorService pool =
-            Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() + 1);
-
+public class CpuBoundLoad {
     private final ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
 
-    public CpuLoadExecutor() {
+    public CpuBoundLoad() {
         if (threadMXBean.isThreadCpuTimeSupported() && !threadMXBean.isThreadCpuTimeEnabled()) {
             threadMXBean.setThreadCpuTimeEnabled(true);
         }
     }
 
-    public long executeBlockingCpuBurn(long targetCpuMillis) throws Exception {
-        Future<Long> future = pool.submit(() -> burnCpu(targetCpuMillis));
-        return future.get(); // ждем результат
-    }
-
-    private long burnCpu(long targetMillis) {
-        long targetNanos = targetCpuMillisToNanos(targetMillis);
+    public long burnCpu(long targetMillis) {
+        long targetNanos = targetMillis * 1_000_000;
         long startCpuNanos = threadMXBean.getCurrentThreadCpuTime();
 
         long waste = 0;
@@ -38,15 +26,10 @@ public class CpuLoadExecutor {
         }
 
         long usedCpuNanos = threadMXBean.getCurrentThreadCpuTime() - startCpuNanos;
-        return usedCpuNanos / 1_000_000; // вернуть в миллисекундах
-    }
-
-    private long targetCpuMillisToNanos(long cpuMillis) {
-        return cpuMillis * 1_000_000;
+        return usedCpuNanos / 1_000_000;
     }
 
     private long wasteSomeCpu(long seed) {
-        // Достаточно тяжёлая операция, чтобы CPU не простаивал
         double x = seed;
         for (int i = 0; i < 100; i++) {
             x = Math.pow(Math.sin(x), 2.0) + Math.sqrt(x + 1);
